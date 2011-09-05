@@ -22,6 +22,7 @@
 # THE SOFTWARE.
 # 
 
+# NOTE: Requires the package python-mysqldb to be installed
 #
 # Create the database user, create the table and grant given permissions
 #  CREATE USER 'dircheck'@'localhost' IDENTIFIED BY 'qwerty';
@@ -33,7 +34,9 @@
 #  CREATE TABLE dircheck.Files(name VARCHAR(25) PRIMARY KEY, mtime INT);
 #
 
-path = "/home/esbjorn/program/python"
+# Settings:
+
+path = "/"
 db_credentials = {'host': 'localhost',
                   'user': 'dircheck',
                   'password': 'qwerty',
@@ -41,6 +44,8 @@ db_credentials = {'host': 'localhost',
 db_table_settings = {'table': 'Files',
                      'name': 'name',   # VARCHAR(25)
                      'mtime': 'mtime'} # INT
+
+################################################################################
 
 import sys
 import os
@@ -51,7 +56,7 @@ import warnings
 def get_files_mtimes (path, min_mtime):
     result = {}
     for file in os.listdir(path):
-        mtime = int(os.stat(file).st_mtime)
+        mtime = int(os.stat(path+"/"+file).st_mtime)
         if mtime > min_mtime:
             result[file] = mtime
     return result
