@@ -73,7 +73,7 @@ def open_table(credentials, table_setting):
         s = table_setting
         conn =  mdb.connect(c['host'], c['user'], c['password'], c['database'])
         cursor = conn.cursor()
-        cursor.execute("CREATE TABLE IF NOT EXISTS "+s['table']+"("+s['name']+" VARCHAR(25) PRIMARY KEY, "+s['mtime']+" INT)")
+        cursor.execute("CREATE TABLE IF NOT EXISTS %s(%s VARCHAR(25) PRIMARY KEY, %s INT)" % (s['table'], s['name'], s['mtime']))
         return conn
     except mdb.Error, e:
         print "Error %d: %s" % (e.args[0],e.args[1])
@@ -81,7 +81,7 @@ def open_table(credentials, table_setting):
         
 def highest_db_mtime(conn, table_setting):
     cursor = conn.cursor()
-    cursor.execute("SELECT MAX("+table_setting['mtime']+") from "+table_setting['table'])
+    cursor.execute("SELECT MAX(%s) from %s" % (table_setting['mtime'], table_setting['table']))
     result = cursor.fetchone()[0]
     cursor.close()
     if result == None:
@@ -94,8 +94,8 @@ def write_to_table(conn, table_setting, filenames_mtimes):
     s = table_setting
     for filename in filenames_mtimes.keys():
         mtime = str(filenames_mtimes[filename])
-        cursor.execute("INSERT INTO "+s['table']+"("+s['name']+", "+s['mtime']+") VALUES('"+filename+"','"+mtime+"') \
-                        ON DUPLICATE KEY UPDATE "+s['mtime']+"='"+mtime+"'")
+        cursor.execute("INSERT INTO %s(%s, %s) VALUES('%s','%s') ON DUPLICATE KEY UPDATE %s=%s" %
+                       (s['table'], s['name'], s['mtime'], filename, mtime, s['mtime'], mtime))
     conn.commit()
     cursor.close()
 
