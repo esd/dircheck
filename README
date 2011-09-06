@@ -7,7 +7,7 @@ Create the database user, create the table and grant given permissions
 
 This script will automatically create the table if it doesn't exist.
 If you want to set it up manually, use:
- CREATE TABLE dircheck.Files(name VARCHAR(25) PRIMARY KEY, mtime INT);
+ CREATE TABLE dircheck.Files(name VARCHAR(25) PRIMARY KEY, mtime INT, flag BOOLEAN NOT NULL DEFAULT true);
 
 --------------------------------------------------------------------------------
 
