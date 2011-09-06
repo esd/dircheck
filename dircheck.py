@@ -3,7 +3,7 @@
 
 # See REAME file for usage instructions
 
-path = "/"
+path = "."
 db_credentials = {'host': 'localhost',
                   'user': 'dircheck',
                   'password': 'qwerty',
@@ -20,19 +20,64 @@ import datetime
 import MySQLdb as mdb
 import warnings
 
-def get_files_mtimes (path, min_mtime):
-    result = {}
-    for file in os.listdir(path):
-        mtime = int(os.stat(path+"/"+file).st_mtime)
-        if mtime > min_mtime:
-            result[file] = mtime
-    return result
+class FilesMtimes():
+    _files_mtimes = {}
 
-def format_mtimes (filenames_mtimes):
-    result = {}
-    for f in filenames_mtimes.keys():
-        result[f] = str(datetime.datetime.fromtimestamp(int(filenames_mtimes[f])))
-    return result
+    def from_path(self, path):
+        for file in os.listdir(path):
+            mtime = int(os.stat(path+"/"+file).st_mtime)
+            self._files_mtimes[file] = mtime
+        return self
+
+    def from_tuples(self, tuples):
+        for (name, mtime) in tuples:
+            self._files_mtimes[name] = int(mtime)
+        return self
+
+    def from_dict(self, dict):
+        self._files_mtimes = dict
+        return self
+
+    def dict(self):
+        return self._files_mtimes
+
+    def keys(self):
+        return self._files_mtimes.keys()
+
+    def mtime(self, name):
+        return self._files_mtimes[name]
+
+    def format(self):
+        result = {}
+        for filename in self.dict():
+            mtime = self._files_mtimes[filename]
+            result[filename] = str(datetime.datetime.fromtimestamp(mtime))
+        return str(result)
+
+    def newer_than(self, mtime):
+        result = {}
+        for filename in self.dict():
+            tmp_mtime = self._files_mtimes[filename]
+            if tmp_mtime > mtime:
+                result[filename] = tmp_mtime
+        return FilesMtimes().from_dict(result)
+
+    ## Return the common elements (with common keys)
+    def intersection(self, files_mtimes):
+        intersect = []
+        for item in self._files_mtimes.keys():
+            if files_mtimes.has_key(item):
+                intersect.append(item)
+        return FilesMtimes().from_dict(intersect)                
+
+    ## Find the elements that were in given set, but are not in this object
+    def deleted(self, old_files_mtimes):
+        result = {}
+        for item in old_files_mtimes.keys():
+            if not self._files_mtimes.has_key(item):
+                result[item] = old_files_mtimes.dict()[item]
+        return FilesMtimes().from_dict(result)                
+        
 
 class FileTable:
     _conn = None
@@ -69,16 +114,48 @@ class FileTable:
         else:
             return result
 
-    def write_to_table(self, filenames_mtimes):
+    def insert_update(self, files_mtimes):
         s = self._table_setting
-        for filename in filenames_mtimes.keys():
-            mtime = str(filenames_mtimes[filename])
+        for filename in files_mtimes.keys():
+            mtime = str(files_mtimes.mtime(filename))
             self._cursor.execute("INSERT INTO %s(%s, %s) VALUES('%s','%s') ON DUPLICATE KEY UPDATE %s=%s" %
                              (s['table'], s['name'], s['mtime'], filename, mtime, s['mtime'], mtime))
         self._conn.commit()
 
+    def delete(self, files_mtimes):
+        s = self._table_setting
+        for filename in files_mtimes.keys():
+            self._cursor.execute("DELETE FROM %s WHERE %s=%s" %
+                                 (s['table'], s['mtime'], filename))
+        self._conn.commit()
+        
+    def get_all(self):
+        s = self._table_setting
+        self._cursor.execute("SELECT %s, %s FROM %s" %
+                             (s['name'], s['mtime'], s['table']))
+        result = self._cursor.fetchall()
+        if result == None:
+            return ()
+        else:
+            return result
+
+    # current_files_mtimes is supposed to be the current filesystem data
+    # This method updates the current db table
+    def update(self, current_files_mtimes):
+        print current_files_mtimes
+        print 0
+        db_files_mtimes = FilesMtimes().from_tuples(self.get_all())
+        print db_files_mtimes.format()
+        deleted_files_mtimes = db_files_mtimes.deleted(current_files_mtimes)
+        self.delete(deleted_files_mtimes)
+        updated_files_mtimes = current_files_mtimes.newer_than(self.highest_db_mtime())
+        self.insert_update(updated_files_mtimes)
+
 def main():
     file_table = FileTable(db_credentials, db_table_settings)
+    file_table.update(FilesMtimes().from_path(path))
+
+def x():
     highest_current_mtime = file_table.highest_db_mtime()
     files_mtimes = get_files_mtimes(path, highest_current_mtime)
     print "New files: "+str(format_mtimes(files_mtimes))
