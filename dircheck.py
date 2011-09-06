@@ -131,7 +131,6 @@ class FileTable:
     def delete(self, files_mtimes):
         s = self._table_setting
         for filename in files_mtimes.keys():
-            print (s['table'], s['name'], filename)
             self._cursor.execute("DELETE FROM %s WHERE %s='%s'" %
                                  (s['table'], s['name'], filename))
         self._conn.commit()
@@ -151,7 +150,6 @@ class FileTable:
     def update(self, current_files_mtimes):
         db_files_mtimes = FilesMtimes().from_tuples(self.get_all())
         deleted_files_mtimes = current_files_mtimes.deleted(db_files_mtimes)
-        print deleted_files_mtimes.format()
         self.delete(deleted_files_mtimes)
         updated_files_mtimes = current_files_mtimes.newer_than(self.highest_db_mtime())
         self.delete(updated_files_mtimes)
