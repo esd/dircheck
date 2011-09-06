@@ -120,7 +120,7 @@ class FileTable:
         else:
             return result
 
-    def insert_update(self, files_mtimes):
+    def insert(self, files_mtimes):
         s = self._table_setting
         for filename in files_mtimes.keys():
             mtime = str(files_mtimes.mtime(filename))
@@ -155,7 +155,7 @@ class FileTable:
         self.delete(deleted_files_mtimes)
         updated_files_mtimes = current_files_mtimes.newer_than(self.highest_db_mtime())
         self.delete(updated_files_mtimes)
-        self.insert_update(updated_files_mtimes)
+        self.insert(updated_files_mtimes)
 
 def main():
     current = FilesMtimes().from_path(path)
