@@ -50,6 +50,9 @@ class FilesMtimes():
     def keys(self):
         return self._files_mtimes.keys()
 
+    def has_key(self, key):
+        return self._files_mtimes.has_key(key)
+
     def mtime(self, name):
         return self._files_mtimes[name]
 
@@ -67,6 +70,19 @@ class FilesMtimes():
             if tmp_mtime > mtime:
                 result[filename] = tmp_mtime
         return FilesMtimes().from_dict(result)
+
+    # Return the ones in the current set that have updated their mtime
+    # since given files_mtimes.
+    # NOTE: Does not handle the deleted ones!
+    def updated_mtimes(self, files_mtimes):
+        result = {}
+        for filename in self.dict():
+            tmp_mtime = self._files_mtimes[filename]
+            if (files_mtimes.has_key(filename) and
+                tmp_mtime != files_mtimes.mtime(filename)):
+                result[filename] = tmp_mtime
+        return FilesMtimes().from_dict(result)
+        
 
     ## Return the common elements (with common keys)
     def intersection(self, files_mtimes):
@@ -151,7 +167,7 @@ class FileTable:
         db_files_mtimes = FilesMtimes().from_tuples(self.get_all())
         deleted_files_mtimes = current_files_mtimes.deleted(db_files_mtimes)
         self.delete(deleted_files_mtimes)
-        updated_files_mtimes = current_files_mtimes.newer_than(self.highest_db_mtime())
+        updated_files_mtimes = current_files_mtimes.updated_mtimes(db_files_mtimes)
         self.delete(updated_files_mtimes)
         self.insert(updated_files_mtimes)
 
