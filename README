@@ -3,7 +3,7 @@ NOTE: Requires the package python-mysqldb to be installed
 Create the database user, create the table and grant given permissions
  CREATE USER 'dircheck'@'localhost' IDENTIFIED BY 'qwerty';
  CREATE DATABASE dircheck;
- GRANT SELECT,INSERT,UPDATE,CREATE ON dircheck.* TO 'dircheck'@'localhost';
+ GRANT SELECT,INSERT,UPDATE,CREATE,DELETE ON dircheck.* TO 'dircheck'@'localhost';
 
 This script will automatically create the table if it doesn't exist.
 If you want to set it up manually, use:
