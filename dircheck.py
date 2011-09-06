@@ -34,46 +34,55 @@ def format_mtimes (filenames_mtimes):
         result[f] = str(datetime.datetime.fromtimestamp(int(filenames_mtimes[f])))
     return result
 
-def open_table(credentials, table_setting):
-    try:
-        c = credentials
-        s = table_setting
-        conn =  mdb.connect(c['host'], c['user'], c['password'], c['database'])
-        cursor = conn.cursor()
-        cursor.execute("CREATE TABLE IF NOT EXISTS %s(%s VARCHAR(25) PRIMARY KEY, %s INT)" % (s['table'], s['name'], s['mtime']))
-        return conn
-    except mdb.Error, e:
-        print "Error %d: %s" % (e.args[0],e.args[1])
-        sys.exit(1)
-        
-def highest_db_mtime(conn, table_setting):
-    cursor = conn.cursor()
-    cursor.execute("SELECT MAX(%s) from %s" % (table_setting['mtime'], table_setting['table']))
-    result = cursor.fetchone()[0]
-    cursor.close()
-    if result == None:
-        return 0
-    else:
-        return result
+class FileTable:
+    _conn = None
+    _cursor = None
+    _table_setting = None
 
-def write_to_table(conn, table_setting, filenames_mtimes):
-    cursor = conn.cursor()
-    s = table_setting
-    for filename in filenames_mtimes.keys():
-        mtime = str(filenames_mtimes[filename])
-        cursor.execute("INSERT INTO %s(%s, %s) VALUES('%s','%s') ON DUPLICATE KEY UPDATE %s=%s" %
-                       (s['table'], s['name'], s['mtime'], filename, mtime, s['mtime'], mtime))
-    conn.commit()
-    cursor.close()
+    def __init__(self, credentials, table_setting):
+        self._table_setting = table_setting
+        self._open_table(credentials)
+
+    def __del__(self):
+        self._cursor.close()
+        self._conn.close()
+
+    def _open_table(self, credentials):
+        try:
+            c = credentials
+            self._conn =  mdb.connect(c['host'], c['user'], c['password'], c['database'])
+            self._cursor = self._conn.cursor()
+        except mdb.Error, e:
+            print "Error %d: %s" % (e.args[0],e.args[1])
+            sys.exit(1)
+
+    def create_table(self):
+        warnings.filterwarnings("ignore", "Table .* already exists")
+        s = self._table_setting
+        self._cursor.execute("CREATE TABLE IF NOT EXISTS %s(%s VARCHAR(25) PRIMARY KEY, %s INT)" % (s['table'], s['name'], s['mtime']))
+
+    def highest_db_mtime(self):
+        self._cursor.execute("SELECT MAX(%s) from %s" % (self._table_setting['mtime'], self._table_setting['table']))
+        result = self._cursor.fetchone()[0]
+        if result == None:
+            return 0
+        else:
+            return result
+
+    def write_to_table(self, filenames_mtimes):
+        s = self._table_setting
+        for filename in filenames_mtimes.keys():
+            mtime = str(filenames_mtimes[filename])
+            self._cursor.execute("INSERT INTO %s(%s, %s) VALUES('%s','%s') ON DUPLICATE KEY UPDATE %s=%s" %
+                             (s['table'], s['name'], s['mtime'], filename, mtime, s['mtime'], mtime))
+        self._conn.commit()
 
 def main():
-    warnings.filterwarnings("ignore", "Table .* already exists")
-    conn = open_table(db_credentials, db_table_settings)
-    highest_current_mtime = highest_db_mtime(conn, db_table_settings)
+    file_table = FileTable(db_credentials, db_table_settings)
+    highest_current_mtime = file_table.highest_db_mtime()
     files_mtimes = get_files_mtimes(path, highest_current_mtime)
     print "New files: "+str(format_mtimes(files_mtimes))
-    write_to_table(conn, db_table_settings, files_mtimes)
-    conn.close()
+    file_table.write_to_table(files_mtimes)
 
 if __name__ == "__main__":
     main()
