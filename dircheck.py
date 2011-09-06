@@ -23,18 +23,24 @@ import warnings
 class FilesMtimes():
     _files_mtimes = {}
 
+    def _clear(self):
+        self._files_mtimes = {}
+
     def from_path(self, path):
+        self._clear()
         for file in os.listdir(path):
             mtime = int(os.stat(path+"/"+file).st_mtime)
             self._files_mtimes[file] = mtime
         return self
 
     def from_tuples(self, tuples):
+        self._clear()
         for (name, mtime) in tuples:
             self._files_mtimes[name] = int(mtime)
         return self
 
     def from_dict(self, dict):
+        self._clear()
         self._files_mtimes = dict
         return self
 
@@ -118,15 +124,16 @@ class FileTable:
         s = self._table_setting
         for filename in files_mtimes.keys():
             mtime = str(files_mtimes.mtime(filename))
-            self._cursor.execute("INSERT INTO %s(%s, %s) VALUES('%s','%s') ON DUPLICATE KEY UPDATE %s=%s" %
-                             (s['table'], s['name'], s['mtime'], filename, mtime, s['mtime'], mtime))
+            self._cursor.execute("INSERT INTO %s(%s, %s) VALUES('%s','%s')" %
+                                 (s['table'], s['name'], s['mtime'], filename, mtime))
         self._conn.commit()
 
     def delete(self, files_mtimes):
         s = self._table_setting
         for filename in files_mtimes.keys():
-            self._cursor.execute("DELETE FROM %s WHERE %s=%s" %
-                                 (s['table'], s['mtime'], filename))
+            print (s['table'], s['name'], filename)
+            self._cursor.execute("DELETE FROM %s WHERE %s='%s'" %
+                                 (s['table'], s['name'], filename))
         self._conn.commit()
         
     def get_all(self):
@@ -142,24 +149,17 @@ class FileTable:
     # current_files_mtimes is supposed to be the current filesystem data
     # This method updates the current db table
     def update(self, current_files_mtimes):
-        print current_files_mtimes
-        print 0
         db_files_mtimes = FilesMtimes().from_tuples(self.get_all())
-        print db_files_mtimes.format()
-        deleted_files_mtimes = db_files_mtimes.deleted(current_files_mtimes)
+        deleted_files_mtimes = current_files_mtimes.deleted(db_files_mtimes)
+        print deleted_files_mtimes.format()
         self.delete(deleted_files_mtimes)
         updated_files_mtimes = current_files_mtimes.newer_than(self.highest_db_mtime())
+        self.delete(updated_files_mtimes)
         self.insert_update(updated_files_mtimes)
 
 def main():
-    file_table = FileTable(db_credentials, db_table_settings)
-    file_table.update(FilesMtimes().from_path(path))
-
-def x():
-    highest_current_mtime = file_table.highest_db_mtime()
-    files_mtimes = get_files_mtimes(path, highest_current_mtime)
-    print "New files: "+str(format_mtimes(files_mtimes))
-    file_table.write_to_table(files_mtimes)
+    current = FilesMtimes().from_path(path)
+    FileTable(db_credentials, db_table_settings).update(current)
 
 if __name__ == "__main__":
     main()
