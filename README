@@ -1,13 +1,22 @@
+A simple, stand-alone script to reflect files and modification times in a MySQL db.
+It updates the table and quits, which means it should probably be called by crontab to keep the table continously updated.
+
 NOTE: Requires the package python-mysqldb to be installed
 
-Create the database user, create the table and grant given permissions
+All settings are in the top of the actual script. You should change the default values (at least the password).
+
+Create the database user, create the table and grant given permissions:
  CREATE USER 'dircheck'@'localhost' IDENTIFIED BY 'qwerty';
  CREATE DATABASE dircheck;
  GRANT SELECT,INSERT,UPDATE,CREATE,DELETE ON dircheck.* TO 'dircheck'@'localhost';
 
-This script will automatically create the table if it doesn't exist.
-If you want to set it up manually, use:
+This script will not create the table if it doesn't exist (can be changed by calling FileTable.create_table() e.g. from the FileTable constructor).
+It expects the table to look something like:
  CREATE TABLE dircheck.Files(name VARCHAR(25) PRIMARY KEY, mtime INT, flag BOOLEAN NOT NULL DEFAULT true);
+
+Crontab instructions:
+Add to your personal crontab by calling "crontab -e" and setting
+* * * * * /path/to/script/dircheck.py
 
 --------------------------------------------------------------------------------
 
