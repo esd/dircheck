@@ -63,14 +63,6 @@ class FilesMtimes():
             result[filename] = str(datetime.datetime.fromtimestamp(mtime))
         return str(result)
 
-    def newer_than(self, mtime):
-        result = {}
-        for filename in self.dict():
-            tmp_mtime = self.__files_mtimes[filename]
-            if tmp_mtime > mtime:
-                result[filename] = tmp_mtime
-        return FilesMtimes().from_dict(result)
-
     # Return the ones in the current set that have updated their mtime
     # since given files_mtimes.
     # NOTE: Does not handle the deleted or new ones
@@ -91,15 +83,7 @@ class FilesMtimes():
                 result[filename] = self.mtime(filename)
         return FilesMtimes().from_dict(result)
         
-    ## Return the common elements (with common keys)
-    def intersection(self, files_mtimes):
-        intersect = []
-        for item in self.__files_mtimes.keys():
-            if files_mtimes.has_key(item):
-                intersect.append(item)
-        return FilesMtimes().from_dict(intersect)                
-
-    ## Find the elements that were in given set, but are not in this object
+    # Return the ones not in the current set, but present in the old_files_mtimes
     def deleted(self, old_files_mtimes):
         result = {}
         for item in old_files_mtimes.keys():
@@ -109,60 +93,56 @@ class FilesMtimes():
         
 
 class FileTable:
-    _conn = None
-    _cursor = None
-    _table_setting = None
+    __conn = None
+    __cursor = None
+    __table_setting = None
 
     def __init__(self, credentials, table_setting):
-        self._table_setting = table_setting
-        self._open_table(credentials)
+        self.__table_setting = table_setting
+        self.__open_table(credentials)
 
     def __del__(self):
-        self._cursor.close()
-        self._conn.close()
+        self.__cursor.close()
+        self.__conn.close()
 
-    def _open_table(self, credentials):
+    def __open_table(self, credentials):
         try:
             c = credentials
-            self._conn =  mdb.connect(c['host'], c['user'], c['password'], c['database'])
-            self._cursor = self._conn.cursor()
+            self.__conn =  mdb.connect(c['host'], c['user'], c['password'], c['database'])
+            self.__cursor = self.__conn.cursor()
         except mdb.Error, e:
             print "Error %d: %s" % (e.args[0],e.args[1])
             sys.exit(1)
 
     def create_table(self):
         warnings.filterwarnings("ignore", "Table .* already exists")
-        s = self._table_setting
-        self._cursor.execute("CREATE TABLE IF NOT EXISTS %s(%s VARCHAR(25) PRIMARY KEY, %s INT)" % (s['table'], s['name'], s['mtime']))
-
-    def highest_db_mtime(self):
-        self._cursor.execute("SELECT MAX(%s) from %s" % (self._table_setting['mtime'], self._table_setting['table']))
-        result = self._cursor.fetchone()[0]
-        if result == None:
-            return 0
-        else:
-            return result
+        s = self.__table_setting
+        self.__cursor.execute("CREATE TABLE IF NOT EXISTS %s(%s VARCHAR(25) PRIMARY KEY, %s INT)" % (s['table'], s['name'], s['mtime']))
 
     def insert(self, files_mtimes):
-        s = self._table_setting
+        s = self.__table_setting
         for filename in files_mtimes.keys():
             mtime = str(files_mtimes.mtime(filename))
-            self._cursor.execute("INSERT INTO %s(%s, %s) VALUES('%s','%s')" %
+            self.__cursor.execute("INSERT INTO %s(%s, %s) VALUES('%s','%s')" %
                                  (s['table'], s['name'], s['mtime'], filename, mtime))
-        self._conn.commit()
+        self.__conn.commit()
 
     def delete(self, files_mtimes):
-        s = self._table_setting
+        s = self.__table_setting
         for filename in files_mtimes.keys():
-            self._cursor.execute("DELETE FROM %s WHERE %s='%s'" %
+            self.__cursor.execute("DELETE FROM %s WHERE %s='%s'" %
                                  (s['table'], s['name'], filename))
-        self._conn.commit()
+        self.__conn.commit()
         
+    def update(self, files_mtimes):
+        self.delete(files_mtimes)
+        self.insert(files_mtimes)
+
     def get_all(self):
-        s = self._table_setting
-        self._cursor.execute("SELECT %s, %s FROM %s" %
+        s = self.__table_setting
+        self.__cursor.execute("SELECT %s, %s FROM %s" %
                              (s['name'], s['mtime'], s['table']))
-        result = self._cursor.fetchall()
+        result = self.__cursor.fetchall()
         if result == None:
             return ()
         else:
@@ -170,7 +150,7 @@ class FileTable:
 
     # current_files_mtimes is supposed to be the current filesystem data
     # This method updates the current db table
-    def update(self, current_files_mtimes):
+    def update_all(self, current_files_mtimes):
         db_files_mtimes = FilesMtimes().from_tuples(self.get_all())
 
         deleted_files_mtimes = current_files_mtimes.deleted(db_files_mtimes)
@@ -180,17 +160,15 @@ class FileTable:
         self.insert(new_files_mtimes)
 
         updated_files_mtimes = current_files_mtimes.updated(db_files_mtimes)
-        self.delete(updated_files_mtimes)
-        self.insert(updated_files_mtimes)
+        self.update(updated_files_mtimes)
 
         #print deleted_files_mtimes.format()
         #print new_files_mtimes.format()
         #print updated_files_mtimes.format()
 
-
 def main():
     current = FilesMtimes().from_path(path)
-    FileTable(db_credentials, db_table_settings).update(current)
+    FileTable(db_credentials, db_table_settings).update_all(current)
 
 if __name__ == "__main__":
     main()
