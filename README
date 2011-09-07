@@ -12,7 +12,7 @@ Create the database user, create the table and grant given permissions:
 
 This script will not create the table if it doesn't exist (can be changed by calling FileTable.create_table() e.g. from the FileTable constructor).
 It expects the table to look something like:
- CREATE TABLE dircheck.Files(name VARCHAR(25) PRIMARY KEY, mtime INT, flag BOOLEAN NOT NULL DEFAULT true);
+ CREATE TABLE dircheck.Files(id INT NOT NULL AUTO_INCREMENT PRIMARY KEY, name VARCHAR(25), mtime INT);
 
 Crontab instructions:
 Add to your personal crontab by calling "crontab -e" and setting

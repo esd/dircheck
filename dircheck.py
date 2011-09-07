@@ -140,11 +140,6 @@ class FileTable:
             print "Error %d: %s" % (e.args[0],e.args[1])
             sys.exit(1)
 
-    def create_table(self):
-        warnings.filterwarnings("ignore", "Table .* already exists")
-        s = self.__table_setting
-        self.__cursor.execute("CREATE TABLE IF NOT EXISTS %s(%s VARCHAR(25) PRIMARY KEY, %s INT)" % (s['table'], s['name'], s['mtime']))
-
     def insert(self, files_mtimes):
         s = self.__table_setting
         for filename in files_mtimes.keys():
