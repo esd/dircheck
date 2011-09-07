@@ -21,73 +21,80 @@ import MySQLdb as mdb
 import warnings
 
 class FilesMtimes():
-    _files_mtimes = {}
+    __files_mtimes = {}
 
     def _clear(self):
-        self._files_mtimes = {}
+        self.__files_mtimes = {}
 
     def from_path(self, path):
         self._clear()
         for file in os.listdir(path):
             mtime = int(os.stat(path+"/"+file).st_mtime)
-            self._files_mtimes[file] = mtime
+            self.__files_mtimes[file] = mtime
         return self
 
     def from_tuples(self, tuples):
         self._clear()
         for (name, mtime) in tuples:
-            self._files_mtimes[name] = int(mtime)
+            self.__files_mtimes[name] = int(mtime)
         return self
 
     def from_dict(self, dict):
         self._clear()
-        self._files_mtimes = dict
+        self.__files_mtimes = dict
         return self
 
     def dict(self):
-        return self._files_mtimes
+        return self.__files_mtimes
 
     def keys(self):
-        return self._files_mtimes.keys()
+        return self.__files_mtimes.keys()
 
     def has_key(self, key):
-        return self._files_mtimes.has_key(key)
+        return self.__files_mtimes.has_key(key)
 
     def mtime(self, name):
-        return self._files_mtimes[name]
+        return self.__files_mtimes[name]
 
     def format(self):
         result = {}
         for filename in self.dict():
-            mtime = self._files_mtimes[filename]
+            mtime = self.__files_mtimes[filename]
             result[filename] = str(datetime.datetime.fromtimestamp(mtime))
         return str(result)
 
     def newer_than(self, mtime):
         result = {}
         for filename in self.dict():
-            tmp_mtime = self._files_mtimes[filename]
+            tmp_mtime = self.__files_mtimes[filename]
             if tmp_mtime > mtime:
                 result[filename] = tmp_mtime
         return FilesMtimes().from_dict(result)
 
     # Return the ones in the current set that have updated their mtime
     # since given files_mtimes.
-    # NOTE: Does not handle the deleted ones!
-    def updated_mtimes(self, files_mtimes):
+    # NOTE: Does not handle the deleted or new ones
+    def updated(self, old_files_mtimes):
         result = {}
         for filename in self.dict():
-            tmp_mtime = self._files_mtimes[filename]
-            if (files_mtimes.has_key(filename) and
-                tmp_mtime != files_mtimes.mtime(filename)):
+            tmp_mtime = self.__files_mtimes[filename]
+            if (old_files_mtimes.has_key(filename) and
+                tmp_mtime != old_files_mtimes.mtime(filename)):
                 result[filename] = tmp_mtime
         return FilesMtimes().from_dict(result)
-        
 
+    # Return the ones in the current set that were not present in the old_files_mtimes
+    def new(self, old_files_mtimes):
+        result = {}
+        for filename in self.dict():
+            if not old_files_mtimes.has_key(filename):
+                result[filename] = self.mtime(filename)
+        return FilesMtimes().from_dict(result)
+        
     ## Return the common elements (with common keys)
     def intersection(self, files_mtimes):
         intersect = []
-        for item in self._files_mtimes.keys():
+        for item in self.__files_mtimes.keys():
             if files_mtimes.has_key(item):
                 intersect.append(item)
         return FilesMtimes().from_dict(intersect)                
@@ -96,7 +103,7 @@ class FilesMtimes():
     def deleted(self, old_files_mtimes):
         result = {}
         for item in old_files_mtimes.keys():
-            if not self._files_mtimes.has_key(item):
+            if not self.__files_mtimes.has_key(item):
                 result[item] = old_files_mtimes.dict()[item]
         return FilesMtimes().from_dict(result)                
         
@@ -165,11 +172,21 @@ class FileTable:
     # This method updates the current db table
     def update(self, current_files_mtimes):
         db_files_mtimes = FilesMtimes().from_tuples(self.get_all())
+
         deleted_files_mtimes = current_files_mtimes.deleted(db_files_mtimes)
         self.delete(deleted_files_mtimes)
-        updated_files_mtimes = current_files_mtimes.updated_mtimes(db_files_mtimes)
+
+        new_files_mtimes = current_files_mtimes.new(db_files_mtimes)
+        self.insert(new_files_mtimes)
+
+        updated_files_mtimes = current_files_mtimes.updated(db_files_mtimes)
         self.delete(updated_files_mtimes)
         self.insert(updated_files_mtimes)
+
+        #print deleted_files_mtimes.format()
+        #print new_files_mtimes.format()
+        #print updated_files_mtimes.format()
+
 
 def main():
     current = FilesMtimes().from_path(path)
