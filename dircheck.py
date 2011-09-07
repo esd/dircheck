@@ -23,24 +23,24 @@ import warnings
 class FilesMtimes():
     __files_mtimes = {}
 
-    def _clear(self):
+    def __clear(self):
         self.__files_mtimes = {}
 
     def from_path(self, path):
-        self._clear()
+        self.__clear()
         for file in os.listdir(path):
             mtime = int(os.stat(path+"/"+file).st_mtime)
             self.__files_mtimes[file] = mtime
         return self
 
     def from_tuples(self, tuples):
-        self._clear()
+        self.__clear()
         for (name, mtime) in tuples:
             self.__files_mtimes[name] = int(mtime)
         return self
 
     def from_dict(self, dict):
-        self._clear()
+        self.__clear()
         self.__files_mtimes = dict
         return self
 
