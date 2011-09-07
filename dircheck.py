@@ -19,6 +19,7 @@ import os
 import datetime
 import MySQLdb as mdb
 import warnings
+import unittest
 
 class FilesMtimes():
     __files_mtimes = {}
@@ -90,7 +91,32 @@ class FilesMtimes():
             if not self.__files_mtimes.has_key(item):
                 result[item] = old_files_mtimes.dict()[item]
         return FilesMtimes().from_dict(result)                
-        
+
+class TestFilesMtimes(unittest.TestCase):
+    testtuple1 = (("a",10),("b",20),("c",30))
+    testtuple2 = (("a",20),("b",2),("d",40))
+    fmt1 = None
+    fmt2 = None
+    
+    def setUp(self):
+        self.fmt1 = FilesMtimes().from_tuples(self.testtuple1)
+        self.fmt2 = FilesMtimes().from_tuples(self.testtuple2)
+
+    def test_new(self):
+        f = self.fmt2
+        oldf = self.fmt1
+        self.assertEqual(f.new(oldf).dict(), {"d" : 40}) 
+
+    def test_updated(self):
+        f = self.fmt2
+        oldf = self.fmt1
+        self.assertEqual(f.updated(oldf).dict(), {"a" : 20, "b" : 2}) 
+
+    def test_deleted(self):
+        f = self.fmt2
+        oldf = self.fmt1
+        self.assertEqual(f.deleted(oldf).dict(), {"c" : 30}) 
+             
 
 class FileTable:
     __conn = None
@@ -169,6 +195,9 @@ class FileTable:
 def main():
     current = FilesMtimes().from_path(path)
     FileTable(db_credentials, db_table_settings).update_all(current)
+
+def test():
+    unittest.main()
 
 if __name__ == "__main__":
     main()
